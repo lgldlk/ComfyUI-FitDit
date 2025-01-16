@@ -17,7 +17,7 @@ import random
 import torch
 import cv2
 from torch.utils import data
-from utils.transforms import get_affine_transform
+from ..utils.transforms import get_affine_transform
 
 
 class LIPDataSet(data.Dataset):

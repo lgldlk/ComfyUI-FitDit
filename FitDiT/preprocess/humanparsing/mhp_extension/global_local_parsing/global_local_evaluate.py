@@ -23,10 +23,10 @@ import torchvision.transforms as transforms
 import torch.backends.cudnn as cudnn
 
 import networks
-from utils.miou import compute_mean_ioU
-from utils.transforms import BGR2RGB_transform
-from utils.transforms import transform_parsing, transform_logits
-from mhp_extension.global_local_parsing.global_local_datasets import CropDataValSet
+from ...utils.miou import compute_mean_ioU
+from ...utils.transforms import BGR2RGB_transform
+from ...utils.transforms import transform_parsing, transform_logits
+from .global_local_datasets import CropDataValSet
 
 
 def get_arguments():

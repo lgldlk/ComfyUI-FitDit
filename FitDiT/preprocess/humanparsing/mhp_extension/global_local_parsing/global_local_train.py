@@ -23,13 +23,13 @@ import torch.backends.cudnn as cudnn
 from torch.utils import data
 
 import networks
-import utils.schp as schp
-from datasets.datasets import LIPDataSet
-from datasets.target_generation import generate_edge_tensor
-from utils.transforms import BGR2RGB_transform
-from utils.criterion import CriterionAll
-from utils.encoding import DataParallelModel, DataParallelCriterion
-from utils.warmup_scheduler import SGDRScheduler
+from ...datasets.datasets import LIPDataSet
+from ...datasets.target_generation import generate_edge_tensor
+from ...utils import schp
+from ...utils.transforms import BGR2RGB_transform
+from ...utils.criterion import CriterionAll
+from ...utils.encoding import DataParallelModel, DataParallelCriterion
+from ...utils.warmup_scheduler import SGDRScheduler
 
 
 def get_arguments():
