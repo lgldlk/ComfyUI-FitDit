@@ -17,6 +17,7 @@ from .FitDiT.preprocess.humanparsing.run_parsing import Parsing
 from .FitDiT.preprocess.dwpose import DWposeDetector
 import math
 import random
+from torchvision.transforms import ToPILImage
 
 
 class FitDiTMaskNode:
@@ -34,7 +35,7 @@ class FitDiTMaskNode:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE")  # mask, pose_image, model_image
+    RETURN_TYPES = ("MASK", "IMAGE", "IMAGE")  # mask, pose_image, model_image
     RETURN_NAMES = ("mask", "pose_image", "model_image")
     FUNCTION = "generate_mask"
     CATEGORY = "FitDiT"
@@ -55,7 +56,7 @@ class FitDiTMaskNode:
 
     def generate_mask(self, model_dir, model_image, category, offset_top, offset_bottom, offset_left, offset_right):
         self.initialize_models(model_dir)
-        model_img = Image.fromarray(model_image)
+        model_img = tensor_to_pil(model_image)
         
         mask_result, pose_image = self._generate_mask(
             model_img, category, offset_top, offset_bottom, offset_left, offset_right
@@ -120,7 +121,7 @@ class FitDiTTryOnNode:
         return {
             "required": {
                 "model_dir": ("STRING", {"default": "", "placeholder": "Path to FitDiT model directory"}),
-                "mask": ("IMAGE",),
+                "mask": ("MASK",),
                 "pose_image": ("IMAGE",),
                 "model_image": ("IMAGE",),
                 "garment_image": ("IMAGE",),
@@ -203,10 +204,10 @@ class FitDiTTryOnNode:
         self.generator = self.initialize_model(model_dir)
         
         # Convert inputs to PIL Images
-        model_img = Image.fromarray(model_image)
-        garment_img = Image.fromarray(garment_image)
-        mask = Image.fromarray(mask[:,:,3])  # Get alpha channel
-        pose_image = Image.fromarray(pose_image)
+        model_img = tensor_to_pil(model_image)
+        garment_img = tensor_to_pil(garment_image)
+        mask = tensor_to_pil(mask[:,:,3])  # Get alpha channel
+        pose_image = tensor_to_pil(pose_image)
 
         # Process images
         new_width, new_height = resolution.split("x")
@@ -299,6 +300,13 @@ def unpad_and_resize(padded_im, pad_w, pad_h, original_width, original_height):
     resized_im = cropped_im.resize((original_width, original_height), Image.LANCZOS)
 
     return resized_im
+
+
+def tensor_to_pil(tensor):
+    """Convert a ComfyUI image tensor to PIL Image"""
+    to_pil = ToPILImage()
+    # ComfyUI: [B,H,W,C] -> torchvision: [C,H,W]
+    return to_pil(tensor[0].permute(2, 0, 1))
 
 
 # Add node class to NODE_CLASS_MAPPINGS

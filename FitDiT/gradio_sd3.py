@@ -42,8 +42,7 @@ class FitDiTGenerator:
         device="cuda:0",
         with_fp16=False,
     ):
-        print("")
-        print(model_root, os.path.join(model_root, "transformer_garm"))
+
         weight_dtype = torch.float16 if with_fp16 else torch.bfloat16
         transformer_garm = SD3Transformer2DModel_Garm.from_pretrained(
             os.path.join(model_root, "transformer_garm"), torch_dtype=weight_dtype
