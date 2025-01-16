@@ -13,12 +13,14 @@
 
 import os
 import pdb
+import sys
+
 
 import cv2
 import numpy as np
 from PIL import Image
 from torch.utils import data
-from FitDiT.preprocess.humanparsing.utils.transforms import get_affine_transform
+from ..utils.transforms import get_affine_transform
 
 class SimpleFolderDataset(data.Dataset):
     def __init__(self, root, input_size=[512, 512], transform=None):

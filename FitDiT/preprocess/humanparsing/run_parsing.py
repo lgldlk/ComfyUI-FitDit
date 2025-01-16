@@ -3,9 +3,8 @@ from pathlib import Path
 import sys
 import os
 import onnxruntime as ort
-PROJECT_ROOT = Path(__file__).absolute().parents[0].absolute()
-sys.path.insert(0, str(PROJECT_ROOT))
-from parsing_api import onnx_inference
+
+from .parsing_api import onnx_inference
 import torch
 
 
