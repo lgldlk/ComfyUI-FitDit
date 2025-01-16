@@ -42,7 +42,7 @@ from diffusers.pipelines.stable_diffusion_3.pipeline_output import StableDiffusi
 from transformers import CLIPImageProcessor
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from src.pose_guider import PoseGuider
+from ..src.pose_guider import PoseGuider
 from transformers import CLIPVisionModelWithProjection
 
 if is_torch_xla_available():

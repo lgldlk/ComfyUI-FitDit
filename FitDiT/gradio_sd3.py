@@ -5,26 +5,31 @@ import sys
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
+old_path = sys.path.copy()
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
+
 import math
-from .preprocess.humanparsing.run_parsing import Parsing
-from .preprocess.dwpose import DWposeDetector
+from preprocess.humanparsing.run_parsing import Parsing
+from preprocess.dwpose import DWposeDetector
 from transformers import CLIPVisionModelWithProjection, CLIPImageProcessor
 import torch
 import torch.nn as nn
-from .src.pose_guider import PoseGuider
+from src.pose_guider import PoseGuider
 from PIL import Image
-from .src.utils_mask import get_mask_location
+from src.utils_mask import get_mask_location
 import numpy as np
-from .src.pipeline_stable_diffusion_3_tryon import StableDiffusion3TryOnPipeline
-from .src.transformer_sd3_garm import (
+from src.pipeline_stable_diffusion_3_tryon import StableDiffusion3TryOnPipeline
+from src.transformer_sd3_garm import (
     SD3Transformer2DModel as SD3Transformer2DModel_Garm,
 )
-from .src.transformer_sd3_vton import (
+from src.transformer_sd3_vton import (
     SD3Transformer2DModel as SD3Transformer2DModel_Vton,
 )
 import cv2
 import random
 
+sys.path = old_path
 example_path = os.path.join(os.path.dirname(__file__), "examples")
 
 

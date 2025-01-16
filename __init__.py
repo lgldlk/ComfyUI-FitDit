@@ -2,51 +2,133 @@ import os
 import torch
 import numpy as np
 from PIL import Image
-from .FitDit.src.utils_mask import get_mask_location
+from .FitDiT.src.utils_mask import get_mask_location
 
-from .FitDit.src.pipeline_stable_diffusion_3_tryon import StableDiffusion3TryOnPipeline
-from .FitDit.src.transformer_sd3_garm import (
+from .FitDiT.src.pipeline_stable_diffusion_3_tryon import StableDiffusion3TryOnPipeline
+from .FitDiT.src.transformer_sd3_garm import (
     SD3Transformer2DModel as SD3Transformer2DModel_Garm,
 )
-from .FitDit.src.transformer_sd3_vton import (
+from .FitDiT.src.transformer_sd3_vton import (
     SD3Transformer2DModel as SD3Transformer2DModel_Vton,
 )
-from .FitDit.src.pose_guider import PoseGuider
+from .FitDiT.src.pose_guider import PoseGuider
 from transformers import CLIPVisionModelWithProjection
-from .FitDit.preprocess.humanparsing.run_parsing import Parsing
-from .FitDit.preprocess.dwpose import DWposeDetector
+from .FitDiT.preprocess.humanparsing.run_parsing import Parsing
+from .FitDiT.preprocess.dwpose import DWposeDetector
 import math
 import random
 
 
-class FitDiTNode:
+class FitDiTMaskNode:
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "model_dir": (
-                    "STRING",
-                    {"default": "", "placeholder": "Path to FitDiT model directory"},
-                ),
+                "model_dir": ("STRING", {"default": "", "placeholder": "Path to FitDiT model directory"}),
                 "model_image": ("IMAGE",),  # Model wearing clothes
-                "garment_image": ("IMAGE",),  # Target garment
                 "category": (["Upper-body", "Lower-body", "Dresses"],),
-                "steps": ("INT", {"default": 20, "min": 15, "max": 30}),
-                "guidance_scale": ("FLOAT", {"default": 2.0, "min": 1.0, "max": 5.0}),
-                "seed": (
-                    "INT",
-                    {
-                        "default": 0,
-                        "min": 0,
-                        "max": 2147483647,
-                    },
-                ),
-                "num_images": ("INT", {"default": 1, "min": 1, "max": 4}),
-                "resolution": (["768x1024", "1152x1536", "1536x2048"],),
                 "offset_top": ("INT", {"default": 0, "min": -200, "max": 200}),
                 "offset_bottom": ("INT", {"default": 0, "min": -200, "max": 200}),
                 "offset_left": ("INT", {"default": 0, "min": -200, "max": 200}),
                 "offset_right": ("INT", {"default": 0, "min": -200, "max": 200}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE")  # mask, pose_image, model_image
+    RETURN_NAMES = ("mask", "pose_image", "model_image")
+    FUNCTION = "generate_mask"
+    CATEGORY = "FitDiT"
+
+    def __init__(self):
+        self.device = "cuda"
+        self.model_root = None
+        self.dwprocessor = None
+        self.parsing_model = None
+
+    def initialize_models(self, model_dir):
+        if self.dwprocessor is not None and model_dir == self.model_root:
+            return
+        
+        self.model_root = model_dir
+        self.dwprocessor = DWposeDetector(model_root=model_dir, device=self.device)
+        self.parsing_model = Parsing(model_root=model_dir, device=self.device)
+
+    def generate_mask(self, model_dir, model_image, category, offset_top, offset_bottom, offset_left, offset_right):
+        self.initialize_models(model_dir)
+        model_img = Image.fromarray(model_image)
+        
+        mask_result, pose_image = self._generate_mask(
+            model_img, category, offset_top, offset_bottom, offset_left, offset_right
+        )
+        
+        mask = mask_result["layers"][0]
+        pose_image = np.array(pose_image)
+        
+        return (mask, pose_image, model_image)
+
+    def _generate_mask(self, vton_img, category, offset_top, offset_bottom, offset_left, offset_right):
+        with torch.inference_mode():
+            vton_img_det = resize_image(vton_img)
+            pose_image, keypoints, _, candidate = self.dwprocessor(
+                np.array(vton_img_det)[:, :, ::-1]
+            )
+            candidate[candidate < 0] = 0
+            candidate = candidate[0]
+
+            candidate[:, 0] *= vton_img_det.width
+            candidate[:, 1] *= vton_img_det.height
+
+            pose_image = pose_image[:, :, ::-1]  # rgb
+            pose_image = Image.fromarray(pose_image)
+            model_parse, _ = self.parsing_model(vton_img_det)
+
+            mask, mask_gray = get_mask_location(
+                category,
+                model_parse,
+                candidate,
+                model_parse.width,
+                model_parse.height,
+                offset_top,
+                offset_bottom,
+                offset_left,
+                offset_right,
+            )
+            mask = mask.resize(vton_img.size)
+            mask_gray = mask_gray.resize(vton_img.size)
+            mask = mask.convert("L")
+            mask_gray = mask_gray.convert("L")
+            masked_vton_img = Image.composite(mask_gray, vton_img, mask)
+
+            return {
+                "background": np.array(vton_img.convert("RGBA")),
+                "layers": [
+                    np.concatenate(
+                        (
+                            np.array(mask_gray.convert("RGB")),
+                            np.array(mask)[:, :, np.newaxis],
+                        ),
+                        axis=2,
+                    )
+                ],
+                "composite": np.array(masked_vton_img.convert("RGBA")),
+            }, pose_image
+
+
+class FitDiTTryOnNode:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "model_dir": ("STRING", {"default": "", "placeholder": "Path to FitDiT model directory"}),
+                "mask": ("IMAGE",),
+                "pose_image": ("IMAGE",),
+                "model_image": ("IMAGE",),
+                "garment_image": ("IMAGE",),
+                "steps": ("INT", {"default": 20, "min": 15, "max": 30}),
+                "guidance_scale": ("FLOAT", {"default": 2.0, "min": 1.0, "max": 5.0}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 2147483647}),
+                "num_images": ("INT", {"default": 1, "min": 1, "max": 4}),
+                "resolution": (["768x1024", "1152x1536", "1536x2048"],),
             }
         }
 
@@ -117,39 +199,19 @@ class FitDiTNode:
         self.generator = pipeline
         return pipeline
 
-    def generate(
-        self,
-        model_dir,
-        model_image,
-        garment_image,
-        category,
-        steps,
-        guidance_scale,
-        seed,
-        num_images,
-        resolution,
-        offset_top,
-        offset_bottom,
-        offset_left,
-        offset_right,
-    ):
-        # Initialize or update model if needed
+    def generate(self, model_dir, mask, pose_image, model_image, garment_image, steps, guidance_scale, seed, num_images, resolution):
         self.generator = self.initialize_model(model_dir)
-
-        # Convert inputs to appropriate format
+        
+        # Convert inputs to PIL Images
         model_img = Image.fromarray(model_image)
         garment_img = Image.fromarray(garment_image)
-
-        # Generate mask
-        mask_result, pose_image = self.generate_mask(
-            model_img, category, offset_top, offset_bottom, offset_left, offset_right
-        )
+        mask = Image.fromarray(mask[:,:,3])  # Get alpha channel
+        pose_image = Image.fromarray(pose_image)
 
         # Process images
         new_width, new_height = resolution.split("x")
-        new_width = int(new_width)
-        new_height = int(new_height)
-
+        new_width, new_height = int(new_width), int(new_height)
+        
         model_image_size = model_img.size
         garment_img, _, _ = pad_and_resize(
             garment_img, new_width=new_width, new_height=new_height
@@ -158,16 +220,8 @@ class FitDiTNode:
             model_img, new_width=new_width, new_height=new_height
         )
 
-        mask = mask_result["layers"][0][:, :, 3]
-        mask = Image.fromarray(mask)
-        mask, _, _ = pad_and_resize(
-            mask, new_width=new_width, new_height=new_height, pad_color=(0, 0, 0)
-        )
         mask = mask.convert("L")
-        pose_image = Image.fromarray(np.array(pose_image))
-        pose_image, _, _ = pad_and_resize(
-            pose_image, new_width=new_width, new_height=new_height, pad_color=(0, 0, 0)
-        )
+        pose_image = pose_image.convert("L")
 
         with torch.inference_mode():
             result = self.generator(
@@ -192,55 +246,6 @@ class FitDiTNode:
             output_images.append(np.array(img))
 
         return (output_images,)
-
-    def generate_mask(
-        self, vton_img, category, offset_top, offset_bottom, offset_left, offset_right
-    ):
-        with torch.inference_mode():
-            vton_img_det = resize_image(vton_img)
-            pose_image, keypoints, _, candidate = self.dwprocessor(
-                np.array(vton_img_det)[:, :, ::-1]
-            )
-            candidate[candidate < 0] = 0
-            candidate = candidate[0]
-
-            candidate[:, 0] *= vton_img_det.width
-            candidate[:, 1] *= vton_img_det.height
-
-            pose_image = pose_image[:, :, ::-1]  # rgb
-            pose_image = Image.fromarray(pose_image)
-            model_parse, _ = self.parsing_model(vton_img_det)
-
-            mask, mask_gray = get_mask_location(
-                category,
-                model_parse,
-                candidate,
-                model_parse.width,
-                model_parse.height,
-                offset_top,
-                offset_bottom,
-                offset_left,
-                offset_right,
-            )
-            mask = mask.resize(vton_img.size)
-            mask_gray = mask_gray.resize(vton_img.size)
-            mask = mask.convert("L")
-            mask_gray = mask_gray.convert("L")
-            masked_vton_img = Image.composite(mask_gray, vton_img, mask)
-
-            return {
-                "background": np.array(vton_img.convert("RGBA")),
-                "layers": [
-                    np.concatenate(
-                        (
-                            np.array(mask_gray.convert("RGB")),
-                            np.array(mask)[:, :, np.newaxis],
-                        ),
-                        axis=2,
-                    )
-                ],
-                "composite": np.array(masked_vton_img.convert("RGBA")),
-            }, pose_image
 
 
 def resize_image(img, target_size=768):
@@ -298,10 +303,12 @@ def unpad_and_resize(padded_im, pad_w, pad_h, original_width, original_height):
 
 # Add node class to NODE_CLASS_MAPPINGS
 NODE_CLASS_MAPPINGS = {
-    "FitDiT": FitDiTNode,
+    "FitDiTMask": FitDiTMaskNode,
+    "FitDiTTryOn": FitDiTTryOnNode,
 }
 
 # Add node display name to NODE_DISPLAY_NAME_MAPPINGS
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "FitDiT": "FitDiT",
+    "FitDiTMask": "FitDiT Mask Generator",
+    "FitDiTTryOn": "FitDiT Try-On",
 }

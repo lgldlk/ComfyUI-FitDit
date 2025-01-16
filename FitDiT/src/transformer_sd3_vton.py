@@ -20,8 +20,8 @@ import torch.nn as nn
 
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.loaders import FromOriginalModelMixin, PeftAdapterMixin
-from src.attention_vton import JointTransformerBlock
-from src.attention_processor_vton import Attention, AttentionProcessor, FusedJointAttnProcessor2_0
+from ..src.attention_vton import JointTransformerBlock
+from ..src.attention_processor_vton import Attention, AttentionProcessor, FusedJointAttnProcessor2_0
 from diffusers.models.modeling_utils import ModelMixin
 from diffusers.models.normalization import AdaLayerNormContinuous
 from diffusers.utils import USE_PEFT_BACKEND, is_torch_version, logging, scale_lora_layers, unscale_lora_layers
