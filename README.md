@@ -2,7 +2,9 @@
 
 [中文版](./README_zh.md)
 
-This repository is based on https://github.com/BoyuanJiang/FitDiT and simply wraps it as nodes for ComfyUI.
+This repository is based on [https://github.com/BoyuanJiang/FitDiT](https://github.com/BoyuanJiang/FitDiT) and simply wraps it as nodes for ComfyUI.
+
+![image](./example_images/example1.jpg)
 
 ## Installation
 

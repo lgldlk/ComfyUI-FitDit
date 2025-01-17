@@ -1,6 +1,8 @@
 # ComfyUI-FitDiT
 
-本项目基于https://github.com/BoyuanJiang/FitDiT，只是将其包装为ComfyUI的节点。
+本项目基于 [https://github.com/BoyuanJiang/FitDiT](https://github.com/BoyuanJiang/FitDiT)，只是将其包装为ComfyUI的节点。
+
+![image](./example_images/example1.jpg)
 
 ## Installation
 
