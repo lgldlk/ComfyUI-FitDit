@@ -1,6 +1,8 @@
 # ComfyUI-FitDiT
 
-本项目基于https://github.com/BoyuanJiang/FitDiT，只是将其包装为ComfyUI的节点。
+本项目基于 [https://github.com/BoyuanJiang/FitDiT](https://github.com/BoyuanJiang/FitDiT)，只是将其包装为ComfyUI的节点。
+
+![image](./example_images/example1.jpg)
 
 ## Installation
 
@@ -10,6 +12,7 @@
 
 第三步 在 ComfyUI 中启用 FitDiT 节点
 示例工作流: [example_workflow/fitdit.json](example_workflow/fitdit.json)
+FitDiT Modal Loader 节点的model_dir 需要设置为 _local_model_dir_ （例如：_models/FitDiT_）目录,即第一步的下载模型目录
 
 > **提示：**第一次运行会下载 _openai/clip-vit-large-patch14_ 和 _laion/CLIP-ViT-bigG-14-laion2B-39B-b160k_ 模型，请耐心等待（如果你本地之前没有的话，需要科学）。
 
