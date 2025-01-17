@@ -16,7 +16,14 @@ from .FitDiT.src.pose_guider import PoseGuider
 from transformers import CLIPVisionModelWithProjection
 from .FitDiT.preprocess.humanparsing.run_parsing import Parsing
 from .FitDiT.preprocess.dwpose import DWposeDetector
-from .utils import pil_to_tensor, tensor_to_pil, pad_and_resize, unpad_and_resize
+from .utils import (
+    pil_to_tensor,
+    tensor_to_pil,
+    pad_and_resize,
+    unpad_and_resize,
+    resize_image,
+    numpy_to_tensor,
+)
 
 
 class FitDiTModelLoaderNode:
