@@ -16,8 +16,7 @@ from .FitDiT.src.pose_guider import PoseGuider
 from transformers import CLIPVisionModelWithProjection
 from .FitDiT.preprocess.humanparsing.run_parsing import Parsing
 from .FitDiT.preprocess.dwpose import DWposeDetector
-import math
-from torchvision.transforms import ToPILImage, PILToTensor
+from .utils import pil_to_tensor, tensor_to_pil, pad_and_resize, unpad_and_resize
 
 
 class FitDiTModelLoaderNode:
@@ -162,18 +161,6 @@ class FitDiTMaskNode:
 
         mask = mask_result["layers"][0][:, :, 3]
         pose_image = np.array(pose_image)
-        print("--------")
-        p_mask = numpy_to_tensor(mask, "mask")
-        print(
-            type(mask),
-            mask.shape,
-            type(p_mask),
-            p_mask.shape,
-            type(pose_image),
-            pose_image.shape,
-            type(model_image),
-        )
-        print("--------")
 
         return (
             numpy_to_tensor(mask, "mask"),
@@ -272,9 +259,6 @@ class FitDiTTryOnNode:
         resolution,
     ):
         self.generator = fitdit_model["generator"]
-        print("--------")
-        print(type(mask), mask.shape)
-        print("--------")
         # Convert inputs to PIL Images
         model_img = tensor_to_pil(model_image)
         garment_img = tensor_to_pil(garment_image)
@@ -300,12 +284,7 @@ class FitDiTTryOnNode:
         )
 
         mask = mask.convert("L")
-        # Print mask values for debugging
-        mask_array = np.array(mask)
-        print("Mask shape:", mask_array.shape)
-        print("Mask unique values:", np.unique(mask_array))
-        print("Mask min:", np.min(mask_array))
-        print("Mask max:", np.max(mask_array))
+
         with torch.inference_mode():
             result = self.generator(
                 height=new_height,
@@ -327,102 +306,10 @@ class FitDiTTryOnNode:
             img = unpad_and_resize(
                 img, pad_w, pad_h, model_image_size[0], model_image_size[1]
             )
-            # img.save('')
-            print("--------")
-            print(img.size)
-            print(img.mode)
-            img_array = np.array(img)
-            print(img_array.shape)
-            print(img_array.dtype)
-            print(":", np.unique(img_array))
-            print("--------")
             tensor_img = pil_to_tensor((img.convert("RGB")))
-            print(tensor_img.unique())
-            print(tensor_img.shape)
             output_images.append(tensor_img)
         res = torch.cat(output_images, dim=0)
         return (res,)
-
-
-def resize_image(img, target_size=768):
-    width, height = img.size
-
-    if width < height:
-        scale = target_size / width
-    else:
-        scale = target_size / height
-
-    new_width = int(round(width * scale))
-    new_height = int(round(height * scale))
-
-    resized_img = img.resize((new_width, new_height), Image.LANCZOS)
-
-    return resized_img
-
-
-def pad_and_resize(
-    im, new_width=768, new_height=1024, pad_color=(255, 255, 255), mode=Image.LANCZOS
-):
-    old_width, old_height = im.size
-
-    ratio_w = new_width / old_width
-    ratio_h = new_height / old_height
-    if ratio_w < ratio_h:
-        new_size = (new_width, round(old_height * ratio_w))
-    else:
-        new_size = (round(old_width * ratio_h), new_height)
-
-    im_resized = im.resize(new_size, mode)
-
-    pad_w = math.ceil((new_width - im_resized.width) / 2)
-    pad_h = math.ceil((new_height - im_resized.height) / 2)
-
-    new_im = Image.new("RGB", (new_width, new_height), pad_color)
-    new_im.paste(im_resized, (pad_w, pad_h))
-
-    return new_im, pad_w, pad_h
-
-
-def unpad_and_resize(padded_im, pad_w, pad_h, original_width, original_height):
-    width, height = padded_im.size
-
-    left = pad_w
-    top = pad_h
-    right = width - pad_w
-    bottom = height - pad_h
-
-    cropped_im = padded_im.crop((left, top, right, bottom))
-    resized_im = cropped_im.resize((original_width, original_height), Image.LANCZOS)
-
-    return resized_im
-
-
-def tensor_to_pil(tensor):
-    """Convert a ComfyUI image tensor to PIL Image"""
-    to_pil = ToPILImage()
-    if len(tensor.shape) == 4:
-        # ComfyUI: [B,H,W,C] -> torchvision: [C,H,W]
-        return to_pil(tensor[0].permute(2, 0, 1))
-    else:
-        # MASK [B,H,W] -> torchvision: [C,H,W]
-        return to_pil(tensor[0].unsqueeze(-1).permute(2, 0, 1))
-
-
-def pil_to_tensor(pil_image):
-    # Convert PIL image to tensor with proper scaling
-    tensor = PILToTensor()(pil_image).float()  # Convert to float
-    tensor = tensor.permute(1, 2, 0)  # CHW -> HWC
-    tensor = tensor / 255.0 if tensor.max() > 1.0 else tensor  # Scale to [0,1]
-    return tensor.unsqueeze(0)  # Add batch dimension
-
-
-def numpy_to_tensor(numpy_image, type="image"):
-    # (H x W x C). to [[B,H,W,C]
-    if type == "image":
-        return torch.from_numpy(numpy_image).unsqueeze(0)
-    elif type == "mask":
-        # (H x W x C) to  [B,H,W]
-        return torch.from_numpy(numpy_image).unsqueeze(0)
 
 
 # Add node class to NODE_CLASS_MAPPINGS
