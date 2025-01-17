@@ -1,0 +1,348 @@
+{
+  "last_node_id": 15,
+  "last_link_id": 31,
+  "nodes": [
+    {
+      "id": 13,
+      "type": "FitDiTModelLoader",
+      "pos": [
+        -718.0257568359375,
+        -805.3204956054688
+      ],
+      "size": [
+        315,
+        58
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "FITDIT_MODEL",
+          "type": "FITDIT_MODEL",
+          "links": [
+            19,
+            31
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FitDiTModelLoader"
+      },
+      "widgets_values": [
+        "/data/comfy_modal/FitDiT/"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [
+        -703.625,
+        -663.8754272460938
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            30
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "pasted/image (6).png",
+        "image"
+      ]
+    },
+    {
+      "id": 15,
+      "type": "FitDiTMask",
+      "pos": [
+        -329.6852111816406,
+        -809.378662109375
+      ],
+      "size": [
+        315,
+        194
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "fitdit_model",
+          "type": "FITDIT_MODEL",
+          "link": 31
+        },
+        {
+          "name": "model_image",
+          "type": "IMAGE",
+          "link": 30
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            27
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "pose_image",
+          "type": "IMAGE",
+          "links": [
+            28
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "model_image",
+          "type": "IMAGE",
+          "links": [
+            29
+          ],
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FitDiTMask"
+      },
+      "widgets_values": [
+        "Dresses",
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 8,
+      "type": "LoadImage",
+      "pos": [
+        -346.4744873046875,
+        -562.9586181640625
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            22
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "pasted/image (5).png",
+        "image"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "FitDiTTryOn",
+      "pos": [
+        16.328222274780273,
+        -814.4956665039062
+      ],
+      "size": [
+        315,
+        258
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "fitdit_model",
+          "type": "FITDIT_MODEL",
+          "link": 19
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 27
+        },
+        {
+          "name": "pose_image",
+          "type": "IMAGE",
+          "link": 28
+        },
+        {
+          "name": "model_image",
+          "type": "IMAGE",
+          "link": 29
+        },
+        {
+          "name": "garment_image",
+          "type": "IMAGE",
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            26
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FitDiTTryOn"
+      },
+      "widgets_values": [
+        20,
+        2,
+        962788091,
+        "randomize",
+        3,
+        "768x1024"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [
+        370.5731506347656,
+        -813.8272094726562
+      ],
+      "size": [
+        472.57867431640625,
+        495.54949951171875
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 26
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      19,
+      13,
+      0,
+      14,
+      0,
+      "FITDIT_MODEL"
+    ],
+    [
+      22,
+      8,
+      0,
+      14,
+      4,
+      "IMAGE"
+    ],
+    [
+      26,
+      14,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      27,
+      15,
+      0,
+      14,
+      1,
+      "MASK"
+    ],
+    [
+      28,
+      15,
+      1,
+      14,
+      2,
+      "IMAGE"
+    ],
+    [
+      29,
+      15,
+      2,
+      14,
+      3,
+      "IMAGE"
+    ],
+    [
+      30,
+      3,
+      0,
+      15,
+      1,
+      "IMAGE"
+    ],
+    [
+      31,
+      13,
+      0,
+      15,
+      0,
+      "FITDIT_MODEL"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.5989500000000014,
+      "offset": [
+        1033.5226708666867,
+        1023.2152912562576
+      ]
+    },
+    "ue_links": []
+  },
+  "version": 0.4
+}
