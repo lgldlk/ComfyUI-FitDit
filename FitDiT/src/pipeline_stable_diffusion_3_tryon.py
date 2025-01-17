@@ -38,11 +38,13 @@ from diffusers.utils import (
 )
 from diffusers.utils.torch_utils import randn_tensor
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
-from diffusers.pipelines.stable_diffusion_3.pipeline_output import StableDiffusion3PipelineOutput
+from diffusers.pipelines.stable_diffusion_3.pipeline_output import (
+    StableDiffusion3PipelineOutput,
+)
 from transformers import CLIPImageProcessor
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from ..src.pose_guider import PoseGuider
+from .pose_guider import PoseGuider
 from transformers import CLIPVisionModelWithProjection
 
 if is_torch_xla_available():
@@ -105,9 +107,13 @@ def retrieve_timesteps(
         second element is the number of inference steps.
     """
     if timesteps is not None and sigmas is not None:
-        raise ValueError("Only one of `timesteps` or `sigmas` can be passed. Please choose one to set custom values")
+        raise ValueError(
+            "Only one of `timesteps` or `sigmas` can be passed. Please choose one to set custom values"
+        )
     if timesteps is not None:
-        accepts_timesteps = "timesteps" in set(inspect.signature(scheduler.set_timesteps).parameters.keys())
+        accepts_timesteps = "timesteps" in set(
+            inspect.signature(scheduler.set_timesteps).parameters.keys()
+        )
         if not accepts_timesteps:
             raise ValueError(
                 f"The current scheduler class {scheduler.__class__}'s `set_timesteps` does not support custom"
@@ -117,7 +123,9 @@ def retrieve_timesteps(
         timesteps = scheduler.timesteps
         num_inference_steps = len(timesteps)
     elif sigmas is not None:
-        accept_sigmas = "sigmas" in set(inspect.signature(scheduler.set_timesteps).parameters.keys())
+        accept_sigmas = "sigmas" in set(
+            inspect.signature(scheduler.set_timesteps).parameters.keys()
+        )
         if not accept_sigmas:
             raise ValueError(
                 f"The current scheduler class {scheduler.__class__}'s `set_timesteps` does not support custom"
@@ -132,7 +140,9 @@ def retrieve_timesteps(
     return timesteps, num_inference_steps
 
 
-class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromSingleFileMixin):
+class StableDiffusion3TryOnPipeline(
+    DiffusionPipeline, SD3LoraLoaderMixin, FromSingleFileMixin
+):
     r"""
     Args:
         transformer_garm ([`SD3Transformer2DModel`]):
@@ -157,7 +167,12 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
 
     model_cpu_offload_seq = "image_encoder_large->image_encoder_bigG->pose_guider->transformer_garm->transformer_vton->vae"
     _optional_components = []
-    _callback_tensor_inputs = ["latents", "prompt_embeds", "negative_prompt_embeds", "negative_pooled_prompt_embeds"]
+    _callback_tensor_inputs = [
+        "latents",
+        "prompt_embeds",
+        "negative_prompt_embeds",
+        "negative_pooled_prompt_embeds",
+    ]
 
     def __init__(
         self,
@@ -181,12 +196,16 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
             image_encoder_bigG=image_encoder_bigG,
         )
         self.vae_scale_factor = (
-            2 ** (len(self.vae.config.block_out_channels) - 1) if hasattr(self, "vae") and self.vae is not None else 8
+            2 ** (len(self.vae.config.block_out_channels) - 1)
+            if hasattr(self, "vae") and self.vae is not None
+            else 8
         )
         self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
         self.vit_processing = CLIPImageProcessor()
         self.tokenizer_max_length = (
-            self.tokenizer.model_max_length if hasattr(self, "tokenizer") and self.tokenizer is not None else 77
+            self.tokenizer.model_max_length
+            if hasattr(self, "tokenizer") and self.tokenizer is not None
+            else 77
         )
         self.default_sample_size = (
             self.transformer.config.sample_size
@@ -228,10 +247,16 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
             return_tensors="pt",
         )
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer_3(prompt, padding="longest", return_tensors="pt").input_ids
+        untruncated_ids = self.tokenizer_3(
+            prompt, padding="longest", return_tensors="pt"
+        ).input_ids
 
-        if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(text_input_ids, untruncated_ids):
-            removed_text = self.tokenizer_3.batch_decode(untruncated_ids[:, self.tokenizer_max_length - 1 : -1])
+        if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(
+            text_input_ids, untruncated_ids
+        ):
+            removed_text = self.tokenizer_3.batch_decode(
+                untruncated_ids[:, self.tokenizer_max_length - 1 : -1]
+            )
             logger.warning(
                 "The following part of your input was truncated because `max_sequence_length` is set to "
                 f" {max_sequence_length} tokens: {removed_text}"
@@ -246,7 +271,9 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
 
         # duplicate text embeddings and attention mask for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
-        prompt_embeds = prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
+        prompt_embeds = prompt_embeds.view(
+            batch_size * num_images_per_prompt, seq_len, -1
+        )
 
         return prompt_embeds
 
@@ -278,14 +305,22 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
         )
 
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = tokenizer(prompt, padding="longest", return_tensors="pt").input_ids
-        if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(text_input_ids, untruncated_ids):
-            removed_text = tokenizer.batch_decode(untruncated_ids[:, self.tokenizer_max_length - 1 : -1])
+        untruncated_ids = tokenizer(
+            prompt, padding="longest", return_tensors="pt"
+        ).input_ids
+        if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(
+            text_input_ids, untruncated_ids
+        ):
+            removed_text = tokenizer.batch_decode(
+                untruncated_ids[:, self.tokenizer_max_length - 1 : -1]
+            )
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
                 f" {self.tokenizer_max_length} tokens: {removed_text}"
             )
-        prompt_embeds = text_encoder(text_input_ids.to(device), output_hidden_states=True)
+        prompt_embeds = text_encoder(
+            text_input_ids.to(device), output_hidden_states=True
+        )
         pooled_prompt_embeds = prompt_embeds[0]
 
         if clip_skip is None:
@@ -298,10 +333,14 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
         _, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
-        prompt_embeds = prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
+        prompt_embeds = prompt_embeds.view(
+            batch_size * num_images_per_prompt, seq_len, -1
+        )
 
         pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, num_images_per_prompt, 1)
-        pooled_prompt_embeds = pooled_prompt_embeds.view(batch_size * num_images_per_prompt, -1)
+        pooled_prompt_embeds = pooled_prompt_embeds.view(
+            batch_size * num_images_per_prompt, -1
+        )
 
         return prompt_embeds, pooled_prompt_embeds
 
@@ -421,11 +460,14 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
             )
 
             clip_prompt_embeds = torch.nn.functional.pad(
-                clip_prompt_embeds, (0, t5_prompt_embed.shape[-1] - clip_prompt_embeds.shape[-1])
+                clip_prompt_embeds,
+                (0, t5_prompt_embed.shape[-1] - clip_prompt_embeds.shape[-1]),
             )
 
             prompt_embeds = torch.cat([clip_prompt_embeds, t5_prompt_embed], dim=-2)
-            pooled_prompt_embeds = torch.cat([pooled_prompt_embed, pooled_prompt_2_embed], dim=-1)
+            pooled_prompt_embeds = torch.cat(
+                [pooled_prompt_embed, pooled_prompt_2_embed], dim=-1
+            )
 
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             negative_prompt = negative_prompt or ""
@@ -433,12 +475,20 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
             negative_prompt_3 = negative_prompt_3 or negative_prompt
 
             # normalize str to list
-            negative_prompt = batch_size * [negative_prompt] if isinstance(negative_prompt, str) else negative_prompt
+            negative_prompt = (
+                batch_size * [negative_prompt]
+                if isinstance(negative_prompt, str)
+                else negative_prompt
+            )
             negative_prompt_2 = (
-                batch_size * [negative_prompt_2] if isinstance(negative_prompt_2, str) else negative_prompt_2
+                batch_size * [negative_prompt_2]
+                if isinstance(negative_prompt_2, str)
+                else negative_prompt_2
             )
             negative_prompt_3 = (
-                batch_size * [negative_prompt_3] if isinstance(negative_prompt_3, str) else negative_prompt_3
+                batch_size * [negative_prompt_3]
+                if isinstance(negative_prompt_3, str)
+                else negative_prompt_3
             )
 
             if prompt is not None and type(prompt) is not type(negative_prompt):
@@ -453,21 +503,27 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
                     " the batch size of `prompt`."
                 )
 
-            negative_prompt_embed, negative_pooled_prompt_embed = self._get_clip_prompt_embeds(
-                negative_prompt,
-                device=device,
-                num_images_per_prompt=num_images_per_prompt,
-                clip_skip=None,
-                clip_model_index=0,
+            negative_prompt_embed, negative_pooled_prompt_embed = (
+                self._get_clip_prompt_embeds(
+                    negative_prompt,
+                    device=device,
+                    num_images_per_prompt=num_images_per_prompt,
+                    clip_skip=None,
+                    clip_model_index=0,
+                )
             )
-            negative_prompt_2_embed, negative_pooled_prompt_2_embed = self._get_clip_prompt_embeds(
-                negative_prompt_2,
-                device=device,
-                num_images_per_prompt=num_images_per_prompt,
-                clip_skip=None,
-                clip_model_index=1,
+            negative_prompt_2_embed, negative_pooled_prompt_2_embed = (
+                self._get_clip_prompt_embeds(
+                    negative_prompt_2,
+                    device=device,
+                    num_images_per_prompt=num_images_per_prompt,
+                    clip_skip=None,
+                    clip_model_index=1,
+                )
             )
-            negative_clip_prompt_embeds = torch.cat([negative_prompt_embed, negative_prompt_2_embed], dim=-1)
+            negative_clip_prompt_embeds = torch.cat(
+                [negative_prompt_embed, negative_prompt_2_embed], dim=-1
+            )
 
             t5_negative_prompt_embed = self._get_t5_prompt_embeds(
                 prompt=negative_prompt_3,
@@ -478,10 +534,16 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
 
             negative_clip_prompt_embeds = torch.nn.functional.pad(
                 negative_clip_prompt_embeds,
-                (0, t5_negative_prompt_embed.shape[-1] - negative_clip_prompt_embeds.shape[-1]),
+                (
+                    0,
+                    t5_negative_prompt_embed.shape[-1]
+                    - negative_clip_prompt_embeds.shape[-1],
+                ),
             )
 
-            negative_prompt_embeds = torch.cat([negative_clip_prompt_embeds, t5_negative_prompt_embed], dim=-2)
+            negative_prompt_embeds = torch.cat(
+                [negative_clip_prompt_embeds, t5_negative_prompt_embed], dim=-2
+            )
             negative_pooled_prompt_embeds = torch.cat(
                 [negative_pooled_prompt_embed, negative_pooled_prompt_2_embed], dim=-1
             )
@@ -496,7 +558,12 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
                 # Retrieve the original scale by scaling back the LoRA layers
                 unscale_lora_layers(self.text_encoder_2, lora_scale)
 
-        return prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds
+        return (
+            prompt_embeds,
+            negative_prompt_embeds,
+            pooled_prompt_embeds,
+            negative_pooled_prompt_embeds,
+        )
 
     def check_inputs(
         self,
@@ -505,15 +572,17 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
         callback_on_step_end_tensor_inputs=None,
     ):
         if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
+            raise ValueError(
+                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
+            )
 
         if callback_on_step_end_tensor_inputs is not None and not all(
-            k in self._callback_tensor_inputs for k in callback_on_step_end_tensor_inputs
+            k in self._callback_tensor_inputs
+            for k in callback_on_step_end_tensor_inputs
         ):
             raise ValueError(
                 f"`callback_on_step_end_tensor_inputs` has to be in {self._callback_tensor_inputs}, but found {[k for k in callback_on_step_end_tensor_inputs if k not in self._callback_tensor_inputs]}"
             )
-
 
     def prepare_latents(
         self,
@@ -578,14 +647,13 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
         image_embeds_bigG = self.image_encoder_bigG(cloth).image_embeds
         return torch.cat([image_embeds_large, image_embeds_bigG], dim=1)
 
-    def prepare_image_latents(
-            self,
-            image
-    ):
+    def prepare_image_latents(self, image):
         image_latents = self.vae.encode(image).latent_dist.sample()
-        image_latents = (image_latents-self.vae.config.shift_factor) * self.vae.config.scaling_factor
+        image_latents = (
+            image_latents - self.vae.config.shift_factor
+        ) * self.vae.config.scaling_factor
         return image_latents
-    
+
     @torch.no_grad()
     @replace_example_docstring(EXAMPLE_DOC_STRING)
     def __call__(
@@ -607,7 +675,7 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
         cloth_image=None,
         model_image=None,
         mask=None,
-        pose_image=None
+        pose_image=None,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -688,22 +756,35 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
         device = self._execution_device
 
         lora_scale = (
-            self.joint_attention_kwargs.get("scale", None) if self.joint_attention_kwargs is not None else None
+            self.joint_attention_kwargs.get("scale", None)
+            if self.joint_attention_kwargs is not None
+            else None
         )
-        
 
-        cloth_image_vit = self.vit_processing(images=cloth_image, return_tensors="pt").data['pixel_values']
+        cloth_image_vit = self.vit_processing(
+            images=cloth_image, return_tensors="pt"
+        ).data["pixel_values"]
         cloth_image_vit = cloth_image_vit.to(device=device)
-        cloth_image_enbeds = self._get_clip_image_embeds(cloth_image_vit, num_images_per_prompt, device)
+        cloth_image_enbeds = self._get_clip_image_embeds(
+            cloth_image_vit, num_images_per_prompt, device
+        )
         cloth_image_enbeds = cloth_image_enbeds.to(device=device)
-        cloth_image_enbeds = cloth_image_enbeds.repeat(num_images_per_prompt, *([1] * (cloth_image_enbeds.dim() - 1)))
-        
+        cloth_image_enbeds = cloth_image_enbeds.repeat(
+            num_images_per_prompt, *([1] * (cloth_image_enbeds.dim() - 1))
+        )
+
         if self.do_classifier_free_guidance:
-            cloth_image_enbeds = torch.cat([torch.zeros_like(cloth_image_enbeds), cloth_image_enbeds], dim=0)
+            cloth_image_enbeds = torch.cat(
+                [torch.zeros_like(cloth_image_enbeds), cloth_image_enbeds], dim=0
+            )
 
         # 4. Prepare timesteps
-        timesteps, num_inference_steps = retrieve_timesteps(self.scheduler, num_inference_steps, device, timesteps)
-        num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
+        timesteps, num_inference_steps = retrieve_timesteps(
+            self.scheduler, num_inference_steps, device, timesteps
+        )
+        num_warmup_steps = max(
+            len(timesteps) - num_inference_steps * self.scheduler.order, 0
+        )
         self._num_timesteps = len(timesteps)
 
         # 5. Prepare latent variables
@@ -726,19 +807,24 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
         model_image = model_image.to(latents)
         cloth_image = cloth_image.to(latents)
         mask = mask.to(latents)
-        vton_image = model_image * (mask<0.5)
-        mask = F.interpolate(mask, (vton_image.shape[2]//8, vton_image.shape[3]//8))
+        vton_image = model_image * (mask < 0.5)
+        mask = F.interpolate(mask, (vton_image.shape[2] // 8, vton_image.shape[3] // 8))
         mask = mask[:, 0:1]
         pose_image = self.image_processor.preprocess(pose_image)
-        pose_fea = self.pose_guider(pose_image.to(device=latents.device, dtype=latents.dtype))
+        pose_fea = self.pose_guider(
+            pose_image.to(device=latents.device, dtype=latents.dtype)
+        )
         vton_model_latents = self.prepare_image_latents(vton_image)
         garm_model_latents = self.prepare_image_latents(cloth_image)
         mask = mask.repeat(latents.shape[0], *([1] * (mask.dim() - 1)))
         pose_fea = pose_fea.repeat(latents.shape[0], *([1] * (pose_fea.dim() - 1)))
-        vton_model_latents = vton_model_latents.repeat(latents.shape[0], *([1] * (vton_model_latents.dim() - 1)))
-        garm_model_latents = garm_model_latents.repeat(latents.shape[0], *([1] * (garm_model_latents.dim() - 1)))
-        
-        
+        vton_model_latents = vton_model_latents.repeat(
+            latents.shape[0], *([1] * (vton_model_latents.dim() - 1))
+        )
+        garm_model_latents = garm_model_latents.repeat(
+            latents.shape[0], *([1] * (garm_model_latents.dim() - 1))
+        )
+
         # 6. Denoising loop
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -746,36 +832,66 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
                     continue
 
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = torch.cat([latents] * 2) if self.do_classifier_free_guidance else latents
-                vton_model_input = torch.cat([vton_model_latents] * 2) if self.do_classifier_free_guidance else vton_model_latents
-                mask_input = torch.cat([mask] * 2) if self.do_classifier_free_guidance else mask
-                garm_model_input = torch.cat([torch.zeros_like(garm_model_latents), garm_model_latents]) if self.do_classifier_free_guidance else garm_model_latents
-                pose_fea_input = torch.cat([pose_fea] * 2) if self.do_classifier_free_guidance else pose_fea
-                
+                latent_model_input = (
+                    torch.cat([latents] * 2)
+                    if self.do_classifier_free_guidance
+                    else latents
+                )
+                vton_model_input = (
+                    torch.cat([vton_model_latents] * 2)
+                    if self.do_classifier_free_guidance
+                    else vton_model_latents
+                )
+                mask_input = (
+                    torch.cat([mask] * 2) if self.do_classifier_free_guidance else mask
+                )
+                garm_model_input = (
+                    torch.cat(
+                        [torch.zeros_like(garm_model_latents), garm_model_latents]
+                    )
+                    if self.do_classifier_free_guidance
+                    else garm_model_latents
+                )
+                pose_fea_input = (
+                    torch.cat([pose_fea] * 2)
+                    if self.do_classifier_free_guidance
+                    else pose_fea
+                )
+
                 # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
                 timestep = t.expand(latent_model_input.shape[0])
-                if i==0:
-                    _, ref_key, ref_value = self.transformer_garm(hidden_states=garm_model_input,
-                                        timestep=timestep * 0,
-                                        pooled_projections=cloth_image_enbeds,
-                                        encoder_hidden_states=None,
-                                        return_dict=False)
-                noise_pred = self.transformer_vton(hidden_states=torch.cat([latent_model_input, vton_model_input, mask_input], dim=1),
-                            timestep=timestep,
-                            pooled_projections=cloth_image_enbeds,
-                            encoder_hidden_states=None,
-                            ref_key=ref_key,
-                            ref_value=ref_value,
-                            return_dict=False,
-                            pose_cond=pose_fea_input)[0]
+                if i == 0:
+                    _, ref_key, ref_value = self.transformer_garm(
+                        hidden_states=garm_model_input,
+                        timestep=timestep * 0,
+                        pooled_projections=cloth_image_enbeds,
+                        encoder_hidden_states=None,
+                        return_dict=False,
+                    )
+                noise_pred = self.transformer_vton(
+                    hidden_states=torch.cat(
+                        [latent_model_input, vton_model_input, mask_input], dim=1
+                    ),
+                    timestep=timestep,
+                    pooled_projections=cloth_image_enbeds,
+                    encoder_hidden_states=None,
+                    ref_key=ref_key,
+                    ref_value=ref_value,
+                    return_dict=False,
+                    pose_cond=pose_fea_input,
+                )[0]
                 # perform guidance
                 if self.do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                    noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
+                    noise_pred = noise_pred_uncond + self.guidance_scale * (
+                        noise_pred_text - noise_pred_uncond
+                    )
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latents_dtype = latents.dtype
-                latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0]
+                latents = self.scheduler.step(
+                    noise_pred, t, latents, return_dict=False
+                )[0]
 
                 if latents.dtype != latents_dtype:
                     if torch.backends.mps.is_available():
@@ -790,9 +906,10 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
 
                     latents = callback_outputs.pop("latents", latents)
 
-
                 # call the callback, if provided
-                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                if i == len(timesteps) - 1 or (
+                    (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0
+                ):
                     progress_bar.update()
 
                 if XLA_AVAILABLE:
@@ -802,7 +919,9 @@ class StableDiffusion3TryOnPipeline(DiffusionPipeline, SD3LoraLoaderMixin, FromS
             image = latents
 
         else:
-            latents = (latents / self.vae.config.scaling_factor) + self.vae.config.shift_factor
+            latents = (
+                latents / self.vae.config.scaling_factor
+            ) + self.vae.config.shift_factor
 
             image = self.vae.decode(latents, return_dict=False)[0]
             image = self.image_processor.postprocess(image, output_type=output_type)
