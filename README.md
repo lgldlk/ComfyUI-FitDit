@@ -18,4 +18,4 @@ Example workflow: [example_workflow/fitdit.json](example_workflow/fitdit.json)
 ## TODO LIST
 
 - Custom mask optimization
-- Low VRAM mode
+

@@ -35,6 +35,7 @@ class FitDiTModelLoaderNode:
                     "STRING",
                     {"default": "", "placeholder": "Path to FitDiT model directory"},
                 ),
+                "use_fp16": ("BOOLEAN", {"default": True}),
             }
         }
 
@@ -49,7 +50,7 @@ class FitDiTModelLoaderNode:
         self.parsing_model = None
         self.generator = None
 
-    def load_model(self, model_dir):
+    def load_model(self, model_dir, use_fp16):
         if self.generator is not None and model_dir == self.model_root:
             return (
                 {
@@ -66,7 +67,7 @@ class FitDiTModelLoaderNode:
         self.parsing_model = Parsing(model_root=model_dir, device=self.device)
 
         # Initialize main model components
-        weight_dtype = torch.bfloat16
+        weight_dtype = torch.float16 if use_fp16 else torch.bfloat16
         transformer_garm = SD3Transformer2DModel_Garm.from_pretrained(
             os.path.join(model_dir, "transformer_garm"),
             torch_dtype=weight_dtype,
