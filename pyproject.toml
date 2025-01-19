@@ -1,5 +1,5 @@
 [project]
-name = "ComfyUI-FitDit"
+name = "comfyui-fitdit"
 description = "This repository is based on [https://github.com/BoyuanJiang/FitDiT](https://github.com/BoyuanJiang/FitDiT) and simply wraps it as nodes for ComfyUI."
 version = "1.0.0"
 license = {file = "./FitDiT/LICENSE"}
