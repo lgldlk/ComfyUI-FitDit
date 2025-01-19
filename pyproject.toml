@@ -1,0 +1,14 @@
+[project]
+name = "ComfyUI-FitDit"
+description = "This repository is based on [https://github.com/BoyuanJiang/FitDiT](https://github.com/BoyuanJiang/FitDiT) and simply wraps it as nodes for ComfyUI."
+version = "1.0.0"
+license = {file = "./FitDiT/LICENSE"}
+
+[project.urls]
+Repository = "https://github.com/lgldlk/ComfyUI-FitDit"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "lgldlk"
+DisplayName = "ComfyUI-FitDit"
+Icon = "https://www.gstatic.com/android/keyboard/emojikitchen/20211115/u1fae1/u1fae1_u1f52e.png"
